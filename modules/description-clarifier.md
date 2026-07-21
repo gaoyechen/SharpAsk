@@ -1,8 +1,3 @@
----
-# Internal module — loaded by SharpInput AGENT.md routing, not a standalone skill.
-description:
----
-
 # Description Clarifier
 
 Convert vague user phrasing into concrete dimensions without inventing goals.

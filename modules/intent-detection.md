@@ -1,8 +1,3 @@
----
-# Internal module — loaded by SharpInput AGENT.md routing, not a standalone skill.
-description:
----
-
 # Intent Detection
 
 Identify what the user wants the eventual AI response to do. Do not identify the business scenario here; scenario detection is separate.
@@ -21,7 +16,7 @@ Return these fields into the handoff object:
 {
   "primary_intent": "",
   "secondary_intent": "",
-  "intent_confidence": 0.0,
+  "intent_confidence": "high | medium | low",
   "reason": ""
 }
 ```
@@ -51,5 +46,5 @@ Use `references/intent-taxonomy.md` for full definitions.
 
 - Semantic pattern beats keyword matching.
 - Preserve secondary intent when it affects routing.
-- If confidence < 0.65 or multiple interpretations are plausible, request intent confirmation using `references/interaction-patterns.md`.
+- If confidence is low and plausible interpretations would produce materially different prompts, request intent confirmation using `references/interaction-patterns.md`.
 - Do not upgrade a lightweight wording request into a strategic decision unless the user implies stakes or choice.

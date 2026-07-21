@@ -1,243 +1,137 @@
 ---
 name: sharpinput
 description: >
-  Use when a user asks to optimize, sharpen, clarify, rewrite, pressure-test, or improve an input,
-  prompt, question, requirement, plan, idea, or message before sending it to an AI or person.
-  Trigger on "帮我优化/润色/理清/改一下/这样问行不行", "怎么问 AI 更好", "optimize this prompt",
-  "make this clearer", or any discussion about prompt/question quality. Do not use for directly
-  answering the underlying task, coding, data analysis, or file operations.
-version: 3.2.0
-author: gaoyechen
-license: MIT
-platforms: [windows, macos, linux]
-agent_created: true
-allowed-tools: Read, Write, Glob, Bash, AskUserQuestion, Agent
-metadata:
-  hermes:
-    tags: [prompt, prompt-optimization, ai-agent, input-compiler, skill]
-    related_skills: []
+  Optimize, clarify, rewrite, or pressure-test a user's prompt, question, requirement, plan, idea,
+  or message before it is sent to an AI or person. Use when the user explicitly asks to improve
+  the input itself, asks how to phrase a request, or asks whether a prompt or question is good.
+  Do not use when the user only wants the underlying task executed; clarify mixed requests.
 ---
 
-# SharpInput Agent
+# SharpInput
 
-SharpInput is an **AI input compiler**. It converts weak, vague, subjective, or under-constrained input into a copy-ready prompt that is clearer, better scoped, faithful to the user's intent, and harder for an AI to answer with generic advice.
-
-It does **not** solve the user's underlying task by default. It improves the user's input so another AI response can be better.
+Turn weak or under-constrained input into one faithful, copy-ready prompt. Improve the input; do not solve the underlying task by default.
 
 ## Core Contract
 
-Always preserve these invariants:
+Preserve these invariants:
 
-- **Intent fidelity**: do not change what the user is trying to ask.
-- **No direct task solving**: output an upgraded prompt, not the answer to the underlying task.
-- **Scenario awareness**: when a known scenario is detected, fill scenario-specific slots before generic context.
-- **Default-answer stress test**: challenge generic default answers only when they would weaken the prompt; do not be contrarian for its own sake.
-- **Copy readiness**: final output must include one complete upgraded prompt the user can copy directly.
+- Preserve the user's goal, tone, facts, and constraints.
+- Do not invent scenario facts such as budget, audience, platform, evidence, or desired conclusion.
+- Ask only when a missing field would materially change the result; otherwise use `[方括号占位符]`.
+- Add pressure only when it improves decision quality. Never force contrarian framing.
+- Return at least one complete prompt that can be copied without reconstructing it from the analysis.
+- Do not persist user preferences unless the user has explicitly opted in.
 
-## Agent Structure
+For a mixed request that asks both for prompt optimization and direct execution, ask one concise question to determine which result the user wants first. Do not block when the user has already made the priority clear.
 
-SharpInput is organized as an agent orchestration layer plus focused capability modules.
+## Runtime Workflow
 
-| Layer | File | Role |
-|------|------|------|
-| Main orchestration | `AGENT.md` | full routing flow and handoff contract |
-| Trigger skill | `SKILL.md` | compact runtime checklist loaded on trigger |
-| Capability modules | `modules/*.md` | focused modules for intent, scenario, context, compiling, pressure, judge, rendering |
-| References | `references/*.md` | taxonomies, templates, rubrics, and shared data |
-| Regression assets | `examples/`, `tests/` | examples and acceptance cases |
+Follow this order. [`AGENT.md`](AGENT.md) expands the same workflow; it must not redefine it.
 
-Read `AGENT.md` when the task is non-trivial, ambiguous, scenario-heavy, or Level 2/3.
+1. Normalize the input into `target_input`, `user_instruction`, and `task_mode`.
+2. Assign a level and provisional route.
+3. Detect intent and, when useful, scenario.
+4. Identify missing context and decide whether one clarification is blocking.
+5. Select pressure requirements before compiling the prompt.
+6. Compile the copy-ready prompt.
+7. Run Judge only for Level 3 or an explicitly requested high-risk review.
+8. Apply the quality gates and render the response at the appropriate depth.
 
-## Runtime Flow
+Use the canonical state object in [`references/handoff-contract.md`](references/handoff-contract.md). Keep it internal; never show it to the user.
 
-完整编排流程（输入标准化、路由选择、模块调度、反馈循环）见 [`AGENT.md`](AGENT.md)。
+## Levels And Routes
 
-SKILL.md 负责：触发判断、Gate Level、能力模块索引、质量门、输出要求。
-AGENT.md 负责：完整 routing flow、route map、handoff object、feedback loop。
+| Level | Use when | Route | Interaction limit |
+|---|---|---|---|
+| 0 | quick wording cleanup or very small input | `quick_rewrite` | no questions |
+| 1 | clear goal that needs structure or precision | `quick_rewrite` | at most one blocking question |
+| 2 | comparison, decision, constraints, trade-offs, or requested pressure | `pressure_prompt` | at most one blocking question |
+| 3 | high-risk or hard-to-reverse decision, strategic review, or genuinely useful multi-path analysis | `judge_mode` | at most two critical questions in one turn |
 
-## Trigger Check
+Treat `clarify_first` as a temporary context state, not a downgrade. After the answer, resume the original Level 1, 2, or 3 route.
 
-Trigger SharpInput only when the user asks to improve the input itself.
+Apply these interaction rules:
 
-Use SharpInput:
-
-- "帮我优化这个问题"
-- "这段 prompt 怎么问更好"
-- "帮我润色/理清/改一下"
-- "这样问 AI 行不行"
-- "我想让 AI 帮我做 X，应该怎么提问"
-
-Do not trigger SharpInput:
-
-- user asks you to directly answer, code, analyze data, edit files, or recommend products
-- user asks factual lookup
-- user asks for implementation, not prompt upgrading
-
-If user intent is mixed, stop and ask:
-
-> 🔴 **CHECKPOINT** — mixed intent detected. Ask before routing:
->
-> ```text
-> 你是想让我直接回答这个问题，还是把它改成一个更好的 AI 提问？
-> ```
->
-> Do not proceed until the user answers.
-
-## Gate Level
-
-| Level | When | Default Route |
-|------|------|---------------|
-| Level 0 | very short input or user asks for quick/simple | Quick Rewrite |
-| Level 1 | clear direction, mainly wording/structure improvement | Quick Rewrite or Clarify First |
-| Level 2 | needs stance, constraints, comparison, optimization, or trade-off | Pressure Prompt |
-| Level 3 | high-risk decision, multi-path strategy, long-term impact, or requested review | Judge Mode |
-
-> 🔴 **CHECKPOINT** — Level 3 triggers multi-path output. Before generating, confirm with user:
->
-> ```text
-> 这是一个高风险/多路径问题。我会生成 2-3 条不同风险偏好的路径供你选择。
-> ```
->
-> If user requests downgrade, fall back to Level 2 Pressure Prompt.
-
-Short input is not automatically Level 0. Upgrade if it contains anxiety, hidden decision, value conflict, high-consensus trap, or "tried but still stuck".
-
-### Routing Priority for Level 2
-
-When Level 2 is triggered, the default route is **Pressure Prompt**. Context gaps do NOT downgrade to Clarify First unless the gap is a **required scenario slot** (budget, audience, platform). Follow this rule:
-
-1. If a scenario template matches AND a required slot is missing → Clarify First (ask 1 slot, then compile with placeholder for the rest)
-2. If no scenario template matches → Pressure Prompt (use placeholders for unknown context)
-3. If the user explicitly says "简单优化" or "先别施压" → downgrade to Quick Rewrite
-
-Do NOT route Level 2 to Clarify First just because "context is incomplete". Level 2 exists precisely for problems where context is partial — use placeholders and apply pressure anyway.
+- If the user asks for speed or says not to ask questions, use explicit placeholders.
+- For Level 2, ask only when a missing value could reverse or invalidate the recommendation. Partial context alone is not a reason to downgrade or interrogate the user.
+- For Level 3, collect only decision-critical facts. Do not require every optional field.
+- Do not raise a short input to Level 3 merely because it contains anxiety or strong wording; use stakes, reversibility, and decision impact.
 
 ## Capability Routing
 
-Use capability files as focused reference modules:
+Read only the files needed by the chosen route.
 
 | Need | Read |
-|------|------|
-| identify primary/secondary intent | `modules/intent-detection.md` |
-| detect concrete scenario | `modules/scenario-detection.md` |
-| ask scenario-specific slots | `modules/scenario-slot-elicitation.md` |
-| fill generic missing context | `modules/context-completion.md` |
-| clarify vague subjective description | `modules/description-clarifier.md` |
-| compile final prompt | `modules/prompt-compiler.md` |
-| add pressure without over-contrarian behavior | `modules/pressure-strategy.md` |
-| review high-risk prompts | `modules/judge-review.md` |
-| format user-facing output | `modules/output-renderer.md` |
+|---|---|
+| identify intent | [`modules/intent-detection.md`](modules/intent-detection.md) |
+| detect a concrete scenario | [`modules/scenario-detection.md`](modules/scenario-detection.md) |
+| ask scenario-specific fields | [`modules/scenario-slot-elicitation.md`](modules/scenario-slot-elicitation.md) |
+| complete generic context | [`modules/context-completion.md`](modules/context-completion.md) |
+| clarify subjective language | [`modules/description-clarifier.md`](modules/description-clarifier.md) |
+| select pressure requirements | [`modules/pressure-strategy.md`](modules/pressure-strategy.md) |
+| compile the prompt | [`modules/prompt-compiler.md`](modules/prompt-compiler.md) |
+| review Level 3 output | [`modules/judge-review.md`](modules/judge-review.md) |
+| render the response | [`modules/output-renderer.md`](modules/output-renderer.md) |
 
-Do not load every capability file by default. Read only what the route needs.
+Route modules in this order:
 
-## Shared Handoff Object
+```text
+quick_rewrite:  intent -> optional scenario/context -> compiler -> renderer
+clarify_first:  intent -> scenario/context -> ask -> resume original route
+pressure_prompt: intent -> scenario -> context -> pressure -> compiler -> renderer
+judge_mode:      intent -> scenario -> context -> pressure -> compiler -> judge -> renderer
+```
 
-模块间通过结构化 JSON 传递数据，不使用自然语言 handoff。完整字段定义见 [`references/handoff-contract.md`](references/handoff-contract.md)。
+## Compilation Rules
 
-## Route Selection
+Include only elements that materially improve the downstream answer:
 
-四条路由（Quick Rewrite / Clarify First / Pressure Prompt / Judge Mode）的完整模块调度链见 [`AGENT.md` Route Map](AGENT.md#route-map)。
+- State the task goal clearly.
+- Add known context and explicit constraints.
+- Specify evaluation criteria and output format when useful.
+- Use a role or perspective only when it changes the quality of judgment.
+- Ask for concise rationale, evidence, assumptions, or verification steps when analysis matters. Never request hidden chain-of-thought or a full internal reasoning process.
+- Add examples only when they disambiguate the expected result.
+- For decisions, require a recommendation, trade-off, and flip condition when supported by the user's context.
+- For generation, specify audience, format, boundaries, and acceptance criteria.
+- For simple wording edits, keep the prompt simple.
+
+## Pressure Rules
+
+Use the default-answer stress test only when a generic answer is likely to be weak:
+
+- Require a clear recommendation and state what is sacrificed.
+- Require a failure condition or signal that would change the recommendation.
+- Request one executable next step.
+
+Skip pressure for translation, light copy polish, simple explanations, and direct factual prompts. See [`references/pressure-strategies.md`](references/pressure-strategies.md) for detailed selection rules.
 
 ## Quality Gates
 
-Before final output:
+Score with [`references/quality-rubric.md`](references/quality-rubric.md). Keep scores internal.
 
-1. **Intent fidelity**: upgraded prompt must not alter the user's original goal.
-2. **Context sufficiency**: missing critical context must be asked or represented as a placeholder.
-3. **Prompt quality score**: target overall >= 7.5 using `tests/quality-rubric.md`.
-4. **Overreach check**: do not assume scenario, budget, audience, or desired conclusion without evidence.
-5. **Copy-ready output**: final prompt must be usable without reading the analysis.
+1. Intent fidelity: preserve the original goal and constraints.
+2. Context handling: ask or expose only high-impact gaps.
+3. Scenario fit: do not force a scenario or template.
+4. Pressure fit: improve specificity without changing intent.
+5. Copy readiness: include a complete prompt.
+6. Brevity fit: output depth must match the level.
 
-If quality is 6.5-7.4, rewrite once. If below 6.5:
+Use one threshold policy:
 
-> 🛑 **STOP** — quality score below 6.5. Do NOT output to user. Return to context completion or scenario slot elicitation and rebuild. Delivering a prompt that scores below 6.5 violates the Core Contract.
+- `>= 8.0`: render.
+- `7.0-7.9`: revise once, then render the improved version.
+- `< 7.0`: rebuild the weak dimensions before rendering. If missing user information is the only blocker, use placeholders or ask within the interaction limit.
 
-## Common Failure Modes
+## Output Depth
 
-| 失败模式 | 症状 | 应对 |
-|---|---|---|
-| 直接回答底层任务 | 输出了"你应该买XXX"而非升级版prompt | 检查 task_mode 是否为 prompt_optimization；回归用例 R9 |
-| 泛泛追问 | 问了"背景是什么"但没问关键槽位 | 用 scenario-slot-elicitation 的 Ask first 问法 |
-| 过度施压 | 简单问题被强行加"反共识"框架 | 检查 overpressure_risk；Level 0/1 不用 pressure |
-| 猜测场景事实 | 假设了用户的预算/用途/受众 | 用 placeholder `[预算范围]` 而非猜测 |
-| 输出格式缺失 | 生成类prompt没有指定输出格式 | prompt-compiler 的 Must Include 检查 |
-| Level 膨胀 | 简单改写被升级为 Level 3 多路径 | 短输入不含焦虑/隐藏决策/价值冲突时保持 Level 0/1 |
+- Level 0: output the upgraded prompt only, optionally followed by one short note.
+- Level 1: output the upgraded prompt plus a concise summary of the important additions.
+- Level 2: output the upgraded prompt plus assumptions/placeholders and one trade-off note.
+- Level 3: output two or three materially different paths only when they are useful, include Judge summaries, and recommend a default path.
 
-## DON'T — 输出反例清单
+Render the prompt consistently as a quote block or plain copy-ready text. Do not output module JSON, internal scores, or hidden reasoning. Follow [`references/output-templates.md`](references/output-templates.md).
 
-以下行为违反 Core Contract，发现即回退重写：
+## Optional Persistence
 
-### 输出风格反例
-| # | 不要这样做 | 为什么 | 替代做法 |
-|---|---|---|---|
-| 1 | 输出"看需求""根据情况""各有优劣" | 废话回答，用户就是因为这个才来优化的 | 强制推荐 + 失败条件 + 切换信号 |
-| 2 | 输出"建议你可以考虑" | 软化措辞降低可执行性 | 直接给出具体步骤或选项 |
-| 3 | 只列清单不给判断 | 对比/决策类问题需要选边站 | 给出对比表 + 明确推荐 + 取舍说明 |
-| 4 | 用"首先…其次…综上"模板 | AI 腔，读起来像自动生成的报告 | 用自然段落或表格组织信息 |
-
-### 格式反例
-| # | 不要这样做 | 为什么 | 替代做法 |
-|---|---|---|---|
-| 5 | 只输出分析/诊断，不输出完整 prompt | 用户要的是可复制的 prompt，不是你的分析 | 分析放前面，完整 prompt 放后面，用 quote block 包裹 |
-| 6 | prompt 里用代码块包裹 | 用户复制时会带上 ``` | 用 > quote block 或纯文本 |
-| 7 | 占位符用 `{}` 或 `<>` | 与 HTML/XML 标签冲突 | 统一用 `[方括号]` |
-
-### 路由反例
-| # | 不要这样做 | 为什么 | 替代做法 |
-|---|---|---|---|
-| 8 | Level 2 因上下文不足降级为 Clarify First | Level 2 就是为部分上下文设计的 | 用 placeholder 补齐，保持 Pressure Prompt |
-| 9 | Level 0/1 加压力测试 | 简单改写不需要施压 | Level 0/1 走 Quick Rewrite，不加载 pressure-strategy |
-| 10 | 猜测用户没提供的事实 | 猜错比不猜更糟 | 用 `[占位符]` 标记，或在"最小补充项"里问 |
-
-## Safety Boundaries
-
-- 不会直接回答用户的底层任务（只输出升级版 prompt）
-- 不会把用户偏好写入仓库或 skill 包内部（见 [`PRIVACY.md`](PRIVACY.md)）
-- 不会发送外部网络请求
-- 不会在没有用户确认时猜测场景特定事实（预算、受众、平台）
-- Level 3 Judge 审查会呈现多条路径，等用户选择
-- 不会将 runtime preference 写入 `references/` 目录
-
-## Output Requirements
-
-Every final response must include:
-
-1. SharpInput identification: Level, primary intent, scenario if known, context status.
-2. Brief diagnosis: why the original input would produce a weak answer.
-3. A complete upgraded prompt in a quote block or fenced text block.
-4. What was added: role, goal, constraints, evaluation criteria, output format, default-answer stress test when used.
-5. Trade-off note.
-6. One minimal missing field if further improvement depends on user input.
-
-Never output only critique, rating, or suggestions.
-
-## References
-
-| File | Purpose |
-|------|---------|
-| `references/intent-taxonomy.md` | canonical 14 intent definitions |
-| `references/scenario-slot-templates.md` | scenario-specific slot templates |
-| `references/prompt-patterns.md` | thinking frameworks and prompt patterns |
-| `references/pressure-strategies.md` | default-answer stress test and pressure rules |
-| `references/output-templates.md` | final output templates |
-| `references/judge-rubric.md` | Judge review rubric |
-| `references/handoff-contract.md` | shared data object |
-| `references/interaction-patterns.md` | user-choice prompts and fallbacks |
-| `references/self-learning.md` | preference learning; runtime state must stay user-local |
-| `references/user-preferences.schema.json` | private preference state schema |
-| `references/user-preferences.example.json` | empty sanitized preference example |
-
-Runtime preference files must not be written into `references/`; use the active Hermes profile data path described in `references/self-learning.md`.
-
-## Regression
-
-Use `tests/regression-cases.md` after structural changes. The essential checks:
-
-- correct trigger decision
-- correct intent and scenario
-- reasonable level
-- scenario slots or placeholders handled
-- no direct answer to underlying task
-- copy-ready upgraded prompt present
-- no generic "看需求" conclusion
-- no forced contrarian behavior
+Use [`references/self-learning.md`](references/self-learning.md) only after the user explicitly opts in to durable preferences. Without opt-in, keep adaptation in the current conversation and perform no file writes.

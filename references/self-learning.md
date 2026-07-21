@@ -2,8 +2,9 @@
 
 ## Overview
 
-After each interaction, analyze the user's choices and update preference data.
-On next invocation, read preferences to personalize the flow.
+Use durable preference learning only after the user explicitly opts in. Without opt-in, adapt within the current conversation and perform no preference-file reads or writes.
+
+After opt-in, record only user-provided choices and feedback. On later invocations, read preferences to personalize the flow.
 
 **Storage**: user-local runtime state, not the published skill package.
 
@@ -12,6 +13,8 @@ Recommended locations:
 1. Hermes profile data file: `$HERMES_HOME/data/sharpinput/user-preferences.json`
 2. If `$HERMES_HOME` is unavailable: the active agent/profile data directory equivalent
 3. If durable file storage is unavailable: skip self-learning silently and run with no preferences
+
+Store consent in the preference file. Treat legacy files without `consent.enabled: true` as not opted in.
 
 The repository ships only:
 
@@ -34,6 +37,7 @@ Never commit a real user's `user-preferences.json`. Runtime preferences are priv
 {
   "schema_version": "1.0",
   "last_updated": "2026-05-07",
+  "consent": {"enabled": true, "granted_at": "2026-05-07"},
   "history": [ ... ],
   "summary": { ... }
 }
@@ -141,17 +145,18 @@ Only present when `outcome_score` is 1 or 2 and reflective diagnosis was trigger
 
 ---
 
-## When to Write — 包含效果追踪（v2.4+）
+## When to Write — Explicit Opt-In Required
 
-After Stage 3 Step 2 outputs the final question:
-1. Resolve the user-local runtime state file path, preferably `$HERMES_HOME/data/sharpinput/user-preferences.json`
-2. If the file does not exist, initialize it from `references/user-preferences.example.json`
-3. Extract all applicable fields from this session into JSON format
-4. Read the runtime preference file
-5. Append this session's data to the `history` array (keep last 10 entries only)
-6. Recalculate the `summary` section from the last 10 entries
-7. Update `last_updated` to current date
-8. Write back as valid JSON to the runtime state path only; never write private preferences into `references/`
+After producing the final prompt:
+1. Confirm that the user explicitly enabled durable SharpInput preferences.
+2. Resolve the user-local runtime state file path, preferably `$HERMES_HOME/data/sharpinput/user-preferences.json`.
+3. If the file does not exist, initialize it from `references/user-preferences.example.json` and set `consent.enabled` plus `consent.granted_at`.
+4. Extract only applicable, user-provided fields from this session.
+5. Append the session data to `history` and keep the last 10 entries.
+6. Recalculate `summary`, update `last_updated`, and validate the JSON object.
+7. Write only to the runtime state path; never write private preferences into `references/`.
+
+If consent is absent, false, or ambiguous, skip all persistence without prompting during an unrelated request.
 
 ### Post-Interaction 效果追踪（可选扩展）
 
@@ -160,7 +165,7 @@ After Stage 3 Step 2 outputs the final question:
 | 触发模式 | 提取字段 | 更新方式 |
 |---------|---------|---------|
 | 用户主动反馈（"上次那个问题好/不好"） | outcome_score (1-5), outcome_note | 查找最后一次同意图的历史条目，更新 |
-| 用户用优化后的问题获得AI回答后回来说结果 | outcome_score (从用户语气推断：积极=4-5，中性=3，负面=1-2) | 同上 |
+| 用户用优化后的问题获得AI回答后回来说结果 | Ask for or record an explicit 1-5 score; do not infer a numeric score from tone | 同上 |
 | 跨会话效果对比（"比上次更好了"） | 无需更新，已记录在 timestamp | 用于 summary 效果趋势分析 |
 
 效果追踪触发后即时更新 history 中对应条目。
@@ -171,7 +176,7 @@ After Stage 3 Step 2 outputs the final question:
 
 #### 触发条件
 
-- `outcome_score` ≤ 2（用户明确表示优化后效果差）
+- explicit `outcome_score` ≤ 2
 - 或用户反馈包含以下模式："效果不好"、"更差了"、"偏了"、"完全不对"、"答非所问"
 
 #### 反思诊断流程
@@ -229,11 +234,11 @@ Step 4: **更新 summary** — 在 `reflection_stats` 中累计统计
 
 ## When to Read
 
-After Gate, before Intent Recognition (the Memory Load step):
-1. Resolve the runtime preference file path, preferably `$HERMES_HOME/data/sharpinput/user-preferences.json`
-2. If it exists, read it and apply `summary` preferences silently
-3. If it does not exist, skip self-learning with no warning
-4. If the old installed package contains `references/user-preferences.json`, treat it as legacy data and migrate it once to the runtime path
+After Gate, before Intent Recognition:
+1. Read durable preferences only when the current user previously opted in.
+2. Resolve the runtime preference path and verify `consent.enabled: true` before applying `summary`.
+3. If the file or consent marker is absent, skip self-learning with no warning.
+4. Do not migrate a legacy file until the user explicitly opts in.
 
 ### 读取规则
 
@@ -277,7 +282,7 @@ After Gate, before Intent Recognition (the Memory Load step):
 
 - 如果最近 10 次中 ≥60% 共享同一个主意图，该意图置信度 +0.1
 - 如果当前输入信号模糊（关键词匹配得分 0.3-0.7），优先选择用户历史 top-3 意图
-- 记录意图修正：当用户通过 AskUserQuestion 纠正意图时，将该输入模式→正确意图的映射记录到 `correction_map` 字段
+- 记录意图修正：当用户通过结构化选择或文字回复纠正意图时，将该输入模式→正确意图的映射记录到 `correction_map` 字段
 
 ### Context Auto-Fill（v2.3）
 

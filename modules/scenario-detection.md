@@ -1,8 +1,3 @@
----
-# Internal module — loaded by SharpInput AGENT.md routing, not a standalone skill.
-description:
----
-
 # Scenario Detection
 
 Identify the concrete scenario so SharpInput can ask useful slot questions instead of generic background questions.
@@ -20,7 +15,7 @@ Identify the concrete scenario so SharpInput can ask useful slot questions inste
 {
   "scenario": "",
   "slot_template": "",
-  "confidence": 0.0,
+  "scenario_confidence": "high | medium | low",
   "reason": ""
 }
 ```

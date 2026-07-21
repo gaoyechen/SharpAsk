@@ -3,10 +3,19 @@
   "title": "SharpInput user preferences",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "last_updated", "history", "summary"],
+  "required": ["schema_version", "last_updated", "consent", "history", "summary"],
   "properties": {
     "schema_version": {"type": "string"},
     "last_updated": {"type": ["string", "null"]},
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "granted_at"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "granted_at": {"type": ["string", "null"]}
+      }
+    },
     "history": {
       "type": "array",
       "maxItems": 10,

@@ -1,0 +1,4 @@
+interface:
+  display_name: "SharpInput"
+  short_description: "Turn rough requests into copy-ready prompts"
+  default_prompt: "Use $sharpinput to turn this rough request into a clear, copy-ready prompt."

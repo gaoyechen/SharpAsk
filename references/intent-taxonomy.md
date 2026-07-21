@@ -25,7 +25,7 @@ Intent describes what the eventual AI answer should do. It is separate from scen
 
 - If one intent clearly dominates, set `primary_intent` and optionally `secondary_intent`.
 - If two intents are tightly coupled, keep both. Example: "帮我判断这个方案并优化提问" = 验证 + 优化.
-- If confidence is below 0.65, ask the user to choose between the top two interpretations.
+- If confidence is low and the interpretations would materially change the prompt, ask the user to choose between the top two interpretations.
 - Do not infer scenario from intent alone. "决策" can mean laptop purchase, AI subscription, hiring, architecture, or career choice.
 
 ## Intent Drift Checks

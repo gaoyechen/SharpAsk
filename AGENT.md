@@ -1,78 +1,71 @@
-# SharpInput Agent
+# SharpInput Orchestration
 
-SharpInput Agent is the orchestration layer for the SharpInput skill system.
+Use this file for non-trivial, scenario-heavy, or Level 2/3 requests. `SKILL.md` is the canonical contract; this file only expands its runtime workflow.
 
-It decides whether SharpInput should trigger, normalizes input, routes to capability modules, preserves intent fidelity, scores prompt quality, and renders the final upgraded prompt.
+## State Initialization
 
-## Core Principle
-
-Agent manages flow. Modules manage capabilities.
-
-The agent should never become a second monolithic skill. It should route to focused files only when needed.
-
-## Trigger Decision
-
-Trigger rules and negative triggers are defined in [`SKILL.md` Trigger Check](SKILL.md#trigger-check).
-
-Mixed intent rule:
-
-```text
-If the user both asks for a better prompt and seems to want the answer, ask:
-"你是想让我直接回答这个问题，还是把它改成一个更好的 AI 提问？"
-```
-
-## Input Normalization
-
-Extract:
-
-- `raw_input`: full user message
-- `target_input`: the part to optimize
-- `user_instruction`: how the user wants it optimized
-- `task_mode`: `prompt_optimization` unless user asks direct execution
-- `ambiguity_level`: low, medium, high
-
-Example:
+Initialize the object defined in [`references/handoff-contract.md`](references/handoff-contract.md):
 
 ```json
 {
-  "raw_input": "帮我优化一下这个问题：我想买电脑，应该怎么问 AI？",
-  "target_input": "我想买电脑",
-  "user_instruction": "优化成更好的 AI 提问",
+  "raw_input": "",
+  "target_input": "",
+  "user_instruction": "",
   "task_mode": "prompt_optimization",
-  "ambiguity_level": "low"
+  "level": 1,
+  "route": "quick_rewrite"
 }
 ```
 
+Extract only what the user supplied. Represent uncertainty explicitly instead of guessing.
+
+## Canonical Flow
+
+1. **Normalize**: isolate the input to optimize and any requested tone, depth, or format.
+2. **Gate**: set `level` and the intended final route.
+3. **Detect intent**: identify primary and optional secondary intent.
+4. **Detect scenario**: run for known scenarios or whenever scenario slots could improve the prompt; leave it empty at low confidence.
+5. **Complete context**: identify known facts, placeholders, and at most the allowed number of blocking questions.
+6. **Select pressure**: write `pressure_requirements` before compilation. Skip when pressure adds no value.
+7. **Compile**: produce `compiled_prompt_draft` using all selected requirements.
+8. **Judge**: for Level 3, return the canonical `judge_result`; revise once when required.
+9. **Quality check**: score internally and repair weak dimensions.
+10. **Render**: write the final response at the depth required by the level.
+
 ## Route Map
 
-| Path | Use When | Modules |
-|------|----------|---------|
-| Quick Rewrite | Level 0/1, simple optimization | intent-detection -> prompt-compiler -> output-renderer |
-| Clarify First | vague subjective input | intent-detection -> scenario-detection -> scenario-slot-elicitation -> description-clarifier -> prompt-compiler -> output-renderer |
-| Pressure Prompt | needs stance/trade-off/comparison | intent-detection -> context-completion -> prompt-compiler -> pressure-strategy -> output-renderer |
-| Judge Mode | high risk, Level 3, multi-path, review requested | intent-detection -> scenario-detection -> context-completion -> prompt-compiler -> pressure-strategy -> judge-review -> output-renderer |
+| Route | Module order |
+|---|---|
+| `quick_rewrite` | intent -> optional scenario/context -> compiler -> renderer |
+| `clarify_first` | intent -> scenario/context -> ask -> resume original route |
+| `pressure_prompt` | intent -> scenario -> context -> pressure -> compiler -> renderer |
+| `judge_mode` | intent -> scenario -> context -> pressure -> compiler -> judge -> renderer |
 
-Gate Level definitions and Capability Routing index are in [`SKILL.md`](SKILL.md).
+`clarify_first` is temporary. Preserve `resume_route` so a Level 2 request returns to `pressure_prompt` after the user answers.
 
-## Handoff Discipline
+## Question Policy
 
-Every module reads and updates the handoff object defined in [`references/handoff-contract.md`](references/handoff-contract.md).
+- Level 0: do not ask.
+- Level 1: ask at most one question when the answer materially changes the prompt.
+- Level 2: ask at most one question only when the missing value can reverse or invalidate the downstream decision; otherwise use placeholders.
+- Level 3: ask at most two critical questions together. Do not collect optional context exhaustively.
+- Any level: respect requests for speed or no questions by using placeholders.
 
-Never pass only prose between modules when structured fields exist. Natural language handoff loses context and causes rule drift.
+Use [`references/interaction-patterns.md`](references/interaction-patterns.md) for choices. If an interactive choice tool is unavailable, ask in concise text.
 
 ## Feedback Loop
 
-| User Feedback | Return To |
-|--------------|-----------|
-| "偏了" | intent-detection |
-| "没问到关键点" | scenario-slot-elicitation |
-| "不够具体" | context-completion |
-| "太普通" | pressure-strategy |
-| "太复杂" | gate level downgrade |
-| "太强硬" | pressure-strategy with lower pressure |
-| "不是这个场景" | scenario-detection |
-| "可以直接用" | self-learning |
+| User feedback | Return to |
+|---|---|
+| "偏了" | intent detection |
+| "不是这个场景" | scenario detection |
+| "没问到关键点" | context or scenario slots |
+| "太普通" | pressure selection |
+| "太复杂" | level/output depth reduction |
+| "太强硬" | lower or remove pressure |
 
-## Final Acceptance
+Update durable preferences only when the user previously opted in. Otherwise apply feedback only to the current conversation.
 
-The agent succeeds only if the final response includes a complete upgraded prompt and does not directly solve the user's original task.
+## Acceptance
+
+Succeed only when the response contains a complete upgraded prompt, preserves the original intent, respects the interaction limit, and does not directly solve the underlying task by default.

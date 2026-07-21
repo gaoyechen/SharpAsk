@@ -1,10 +1,10 @@
 # Interaction Patterns
 
-Use this file when SharpInput needs a user choice through `AskUserQuestion`.
+Use this file when SharpInput needs a user choice.
 
 ## Rules
 
-- Use `AskUserQuestion` whenever the user must choose an intent, context, direction, or path.
+- Prefer an available structured choice tool when the user must choose an intent, context, direction, or path; otherwise ask concise text.
 - Do not output JSON blocks for the user to copy.
 - Options must reflect the user's actual input, not generic labels.
 - Keep to 2-4 options plus the platform's free-form "Other" option when available.
@@ -45,7 +45,7 @@ Use this file when SharpInput needs a user choice through `AskUserQuestion`.
 按 Level 分级，控制交互轮次和深度：
 
 ### Level 0 — 无交互
-跳过所有上下文问题，直接输出四大约束 + 一秒反问。
+跳过所有上下文问题，直接输出升级版输入；必要信息用占位符表示。
 
 ### Level 1 — 最小交互（最多 1 问）
 只问一个最关键问题，使用单选项模板。选中最影响输出质量的那个字段。
@@ -57,8 +57,8 @@ header: "快速确认"
   - "[从输入推导的选项 B]": [输出方向说明]
 ```
 
-### Level 2 — 中等交互（最多 2 问，或 1 个多选项）
-可以问 2 个独立问题，或 1 个含 4 个选项覆盖多维度的问题。
+### Level 2 — 最小必要交互（最多 1 问）
+只问一个会反转或显著改变下游判断的问题；其他缺口使用占位符。
 ```text
 问题: "关于 [输入对象]，你补充哪个会最影响判断？"
 header: "关键约束"
@@ -69,8 +69,8 @@ header: "关键约束"
   - "[维度 D]": [选择后的影响]
 ```
 
-### Level 3 — 深度交互（最多 3 问）
-允许 3 个独立问题渐进推进，第 1 问聚焦核心，第 2 问答延伸，第 3 问验证：
+### Level 3 — 深度交互（最多 2 问）
+把最多两个决策关键问题放在同一轮中，避免连续打断：
 ```text
 问题: "最后一个需要确认的事：[验证性提问]？"
 header: "验证"
@@ -78,7 +78,7 @@ header: "验证"
   - "[选项 A]": [输出影响]
   - "[选项 B]": [输出影响]
 ```
-如果前 2 问已经获取充足上下文，跳过第 3 问。
+如果一个问题已经足够，只问一个。
 
 ## Common Templates
 
@@ -94,7 +94,7 @@ header: "共识预警"
 
 ### Level 1 Light Direction Check
 
-Use only when intent confidence is medium or low.
+Use only when intent confidence is low and the interpretations would materially change the prompt.
 
 ```text
 问题: "我理解为：[1句重构]。方向对吗？"
@@ -107,7 +107,7 @@ header: "方向"
 
 ### Level 2+ Direction Check
 
-Use when the reframe may change the user's meaning, or when the input involves value conflict, irreversible decision, or visible anxiety.
+Use when the reframe may change the user's meaning, especially for irreversible decisions or value conflicts. Anxiety alone is not enough.
 
 ```text
 问题: "重构后的核心问题是：[X]。这个方向对吗？"
@@ -158,7 +158,7 @@ Put the lowest-risk path first and mark it as recommended in the option label wh
 
 ## Fallback Text Format
 
-If `AskUserQuestion` fails:
+If a structured choice tool is unavailable:
 
 ```text
 选择一个方向回复我：

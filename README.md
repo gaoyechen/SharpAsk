@@ -1,4 +1,4 @@
-# ⚡ SharpInput v3.2
+# ⚡ SharpInput v3.3
 
 <p align="center">
   <strong>AI Input Compiler — 把模糊输入编译成可直接复制的高质量 Prompt</strong>
@@ -9,13 +9,13 @@
   <a href="https://github.com/gaoyechen/SharpInput/network/members"><img src="https://img.shields.io/github/forks/gaoyechen/SharpInput?style=social" alt="Forks"></a>
   <a href="https://github.com/gaoyechen/SharpInput/issues"><img src="https://img.shields.io/github/issues/gaoyechen/SharpInput" alt="Issues"></a>
   <a href="https://github.com/gaoyechen/SharpInput/blob/main/LICENSE"><img src="https://img.shields.io/github/license/gaoyechen/SharpInput" alt="License: MIT"></a>
-  <img src="https://img.shields.io/badge/platform-Hermes%20Agent-blueviolet" alt="Platform">
-  <img src="https://img.shields.io/badge/version-v3.2-brightgreen" alt="Version">
+  <img src="https://img.shields.io/badge/platform-Hermes%20%2B%20Codex-blueviolet" alt="Platform">
+  <img src="https://img.shields.io/badge/version-v3.3-brightgreen" alt="Version">
 </p>
 
 > 你花了几百块订阅 AI，却还在用搜索引擎级别的提问方式。
 
-SharpInput 是一个 **Hermes Agent skill**：它不直接替你回答问题，而是先把你的模糊输入、提问、想法、方案或需求，编译成一个更清楚、更有约束、更不容易得到废话回答的 Prompt。
+SharpInput 是一个兼容 **Hermes Agent 和 Codex** 的 skill：它不直接替你回答问题，而是先把模糊输入、提问、想法、方案或需求编译成更清楚、更有约束、更不容易得到废话回答的 Prompt。
 
 ---
 
@@ -27,7 +27,7 @@ SharpInput 是一个 **Hermes Agent skill**：它不直接替你回答问题，�
 
 SharpInput 会把它升级成：
 
-> 我们是 toB SaaS，注册→付费转化率从 8% 降到 3%，持续 3 个月。流量来源没有明显变化，产品近三个月没有大改。请你先判断问题更可能出在产品、市场还是销售，并必须选边站。给出一个大多数人不会先想到的根因假设，并设计一个 30 天内可验证的小实验。最后说明：如果按你的诊断执行，三个月后最可能后悔什么？
+> 我们是 toB SaaS，注册→付费转化率从 8% 降到 3%，持续 3 个月。流量来源没有明显变化，产品近三个月没有大改。请区分已知事实、关键假设和缺失证据，对产品、市场、销售三个方向的根因按优先级排序。明确推荐第一个排查方向，说明依据、暂时放弃了什么，以及什么新证据会推翻这个排序。最后设计一个 30 天内可验证的低成本实验。
 
 差别不是“文案更漂亮”，而是：**目标、背景、约束、判断标准、输出格式和压力测试都被补齐了。**
 
@@ -42,13 +42,12 @@ SharpInput 会把它升级成：
 - 经常觉得 AI 回答“看似全面，其实没用”的人
 - 产品经理、开发者、创业者、内容创作者
 - 想让 AI 给出判断、方案、分析、评审，而不是安全废话的人
-- Hermes Agent 用户，或正在组织个人 AI Agent skill 工作流的人
+- Hermes Agent、Codex 用户，或正在组织个人 AI Agent skill 工作流的人
 
 不适合：
 
 - 你想让 AI 直接执行任务，而不是优化输入
 - 你只需要事实查询、代码执行、文件修改
-- 你不想补任何上下文，只想让 AI 猜你的意图
 
 ---
 
@@ -61,7 +60,8 @@ SharpInput 会把它升级成：
 ```bash
 git clone https://github.com/gaoyechen/SharpInput.git
 mkdir -p "$LOCALAPPDATA/hermes/skills/sharpinput"
-cp -R SharpInput/* "$LOCALAPPDATA/hermes/skills/sharpinput/"
+cp SharpInput/SKILL.md SharpInput/AGENT.md "$LOCALAPPDATA/hermes/skills/sharpinput/"
+cp -R SharpInput/agents SharpInput/modules SharpInput/references "$LOCALAPPDATA/hermes/skills/sharpinput/"
 ```
 
 然后在 Hermes 中运行：
@@ -121,12 +121,6 @@ hermes chat --skills sharpinput -q "帮我优化：为什么我的 GitHub skill 
 输出节选：
 
 ```text
-[SharpInput 识别结果]
-Level: 2
-主意图: 让 AI 帮你诊断一个 GitHub 项目/skill 没有 star 的原因
-场景: GitHub 项目增长/传播/定位分析
-上下文状态: 缺 repo 链接、目标用户、README、发布渠道，所以用占位符保留
-
 [升级版问题]
 > 你是一名熟悉 GitHub 开源项目增长、开发者工具传播、AI Agent/Skill 生态的产品顾问。
 >
@@ -146,9 +140,9 @@ Level: 2
   ↓
 触发判断
   ↓
-意图识别 → 场景检测 → 上下文补全
+意图识别 → 场景检测 → 上下文补全 → 压力策略选择
   ↓
-Prompt 编译 → 默认答案压力测试 → 质量检查
+Prompt 编译 → Judge（仅 Level 3）→ 质量检查
   ↓
 复制即用的升级版 Prompt
 ```
@@ -160,7 +154,7 @@ Prompt 编译 → 默认答案压力测试 → 质量检查
 | 意图识别 | 判断用户到底是在求解释、决策、对比、规划、验证还是表达 |
 | 场景检测 | 针对电脑选购、AI 订阅、PRD、UI 评审、学习备考等场景补关键槽位 |
 | 上下文补全 | 只问真正影响输出质量的问题，避免泛泛追问“背景是什么” |
-| Prompt 编译 | 把角色、目标、约束、判断标准、步骤和输出格式组织成可复制 Prompt |
+| Prompt 编译 | 按任务需要选择目标、约束、判断标准、依据和输出格式，避免模板堆砌 |
 | 默认答案压力测试 | 防止 AI 输出“看情况”“各有优劣”“建议综合考虑”式废话 |
 | Judge 审查 | Level 3 下对高风险决策和方案评审做更严格的质量检查 |
 
@@ -173,14 +167,14 @@ Prompt 编译 → 默认答案压力测试 → 质量检查
 - 不会直接回答你的底层任务（只输出升级版 prompt）
 - 不会发送外部网络请求
 - 不会在没有你确认时猜测场景特定事实（预算、受众、平台）
-- 不会把你的偏好写入仓库或 skill 包内部（见 [PRIVACY.md](PRIVACY.md)）
-- Level 3 Judge 审查会呈现多条路径，等你选择
+- 未经明确同意不会读取或写入持久化偏好；启用后也只写用户本地状态（见 [PRIVACY.md](PRIVACY.md)）
+- Level 3 只在多路径确实有价值时呈现多条路径
 
 **什么时候 SharpInput 会停下来问你：**
 
 - 你的意图混合了"优化输入"和"直接回答"
 - 关键上下文缺失（预算、受众、约束），用 placeholder 会影响质量
-- 信心低于 0.65 时，会请你确认意图
+- 存在会显著改变结果的低置信度歧义时，会请你确认意图
 
 ---
 
@@ -188,8 +182,9 @@ Prompt 编译 → 默认答案压力测试 → 质量检查
 
 ```text
 SharpInput/
-├── SKILL.md                         # Hermes skill 入口
-├── AGENT.md                         # 编排流程和 handoff 规范
+├── SKILL.md                         # 核心运行契约
+├── AGENT.md                         # 核心契约的详细编排说明
+├── agents/openai.yaml               # Codex UI 元数据
 ├── modules/                         # 内部能力模块，不会被 Hermes 识别成独立 skills
 │   ├── intent-detection.md
 │   ├── scenario-detection.md
@@ -208,7 +203,7 @@ SharpInput/
 └── PRIVACY.md                       # 本地状态和隐私说明
 ```
 
-设计原则：**Agent 管流程，modules 管能力。** 内部模块不再放在顶层 `skills/` 目录下，避免安装后污染用户的 Hermes skills 列表。
+设计原则：**SKILL 定义唯一契约，AGENT 展开流程，modules 实现能力。** 内部模块不作为独立 skill 安装。
 
 ---
 
@@ -223,7 +218,7 @@ references/user-preferences.schema.json
 references/user-preferences.example.json
 ```
 
-真实偏好应存储在用户本地 profile 数据目录，例如：
+只有用户明确启用持久化偏好后，真实偏好才存储在用户本地 profile 数据目录，例如：
 
 ```text
 $HERMES_HOME/data/sharpinput/user-preferences.json
@@ -235,11 +230,19 @@ $HERMES_HOME/data/sharpinput/user-preferences.json
 
 ## 回归检查
 
-修改 `SKILL.md`、`AGENT.md`、`modules/` 或 `references/` 后，至少检查：
+修改 `SKILL.md`、`AGENT.md`、`modules/` 或 `references/` 后，先运行：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/validate-skill.ps1
+```
+
+在 macOS/Linux 且已安装 PowerShell 时使用 `pwsh -File scripts/validate-skill.ps1`。
+
+再检查：
 
 ```text
 tests/regression-cases.md
-tests/quality-rubric.md
+references/quality-rubric.md
 ```
 
 关键标准：
@@ -247,12 +250,22 @@ tests/quality-rubric.md
 - 只在“优化输入/Prompt”场景触发
 - 不直接回答底层任务
 - 输出必须包含一个完整、可复制的升级版 Prompt
-- Level 2+ 不应该跳过关键上下文
+- Level 2 只追问会反转或误导下游判断的关键上下文
 - 不应该强行反共识或过度施压
 
 ---
 
 ## Changelog
+
+### v3.3
+
+- 统一状态机：场景检测和上下文补全先于压力选择，压力选择先于 Prompt 编译
+- 将 `clarify_first` 改为临时状态，统一 Level 2 追问与占位符规则
+- 统一 Judge JSON 协议和质量阈值
+- 删除强制展示推理过程、强制角色和 Level 1+ 全量结构模板
+- 输出改为 Prompt 优先、按 Level 递增信息密度
+- 持久化偏好改为显式 opt-in
+- 新增 Codex `agents/openai.yaml` 和静态验证脚本
 
 ### v3.2
 
@@ -265,7 +278,6 @@ tests/quality-rubric.md
   - modules/*.md frontmatter 修复（防止被识别为独立 skill）
   - README 增加安全边界、致谢、装完第一句话
   - 新增 scripts/ 目录（demo 录制脚本 + vhs tape）
-- 新增 test-prompts.json（3 个典型测试场景）
 
 ### v3.1
 

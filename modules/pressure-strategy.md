@@ -1,8 +1,3 @@
----
-# Internal module — loaded by SharpInput AGENT.md routing, not a standalone skill.
-description:
----
-
 # Pressure Strategy
 
 Add judgment pressure without becoming contrarian for its own sake.
@@ -32,7 +27,7 @@ The goal is not to oppose the mainstream. The goal is to test whether the defaul
 
 ## Rules
 
-- Strongly enable for decision, comparison, validation, and high-stakes analysis.
+- Default to strong pressure for decision, comparison, validation, and high-stakes analysis only when a generic answer is likely to be weak.
 - Use medium pressure for optimization and product/technical analysis.
 - Use weak pressure or skip for factual explanation, translation, light copy polish, and direct debugging.
 - If pressure changes the user's intent, reduce pressure and mark the risk.

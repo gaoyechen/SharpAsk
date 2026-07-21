@@ -1,6 +1,6 @@
 # Scenario Slot Templates
 
-Scenario templates collect the variables that most affect prompt quality. Ask at most 1-3 high-impact slots at once.
+Scenario templates collect the variables that most affect prompt quality. Respect the route limit: no questions at Level 0, at most one at Level 1/2, and at most two critical questions at Level 3.
 
 ## Slot Priority
 

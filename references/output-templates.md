@@ -1,109 +1,67 @@
-# SharpInput Output Templates
+# Output Templates
 
-Use these templates only after intent, scenario, context, and prompt compilation are complete.
+Put the copy-ready prompt first. Include supporting information only when it helps the user fill placeholders or choose between meaningful alternatives.
 
-The final answer must help the user copy the upgraded input immediately. Do not make the user reconstruct the prompt from analysis.
-
-## Standard Template
+## Level 0
 
 ```text
-[SharpInput 识别结果]
-Level: Level X
-主意图: ...
-场景: ...
-上下文状态: complete | partial | insufficient
+> [Complete upgraded prompt]
+```
 
-[原输入诊断]
-1. ...
-2. ...
-3. ...
+Optionally add one short note when a placeholder needs explanation.
 
+## Level 1
+
+```text
 [升级版输入]
-> ...
-（提示：Level 1+ 的升级版输入应遵循结构化模板 — 包含推理步骤、输出格式、示例、注意事项等分节）
+> [Complete upgraded prompt]
 
-[这版升级加入了什么]
-1. 角色/视角:
-2. 目标:
-3. 约束:
-4. 判断标准:
-5. 输出格式:
-6. 推理先行:
-7. 结构化模板:
-8. 默认答案压力测试:
-
-[取舍提醒]
-...
-
-[最小补充项]
-...
+[关键改动]
+[One concise sentence]
 ```
 
-## Quick Template
-
-Use when the user asks for quick rewrite, simple polish, or Level 0/1 output.
+## Level 2
 
 ```text
-[SharpInput Level X]
+[升级版输入]
+> [Complete upgraded prompt]
 
-诊断: ...
+[待替换信息]
+- [Only material placeholders]
 
-升级版:
-> ...
-
-补充: 加入了 ...；保留了 ...
+[取舍]
+[One concrete trade-off introduced by the prompt]
 ```
 
-## Clarify-First Template
+Omit `[待替换信息]` when no material placeholders remain.
 
-Use when one field would materially improve the prompt and asking is better than guessing.
+## Level 3
 
 ```text
-[SharpInput 需要补一刀]
+[路径 A：label]
+> [Complete prompt A]
+Judge: pass | minor_fix | rewrite_required
+风险: low | conditional | high
+翻转条件: ...
 
-我能先给出可用版本，但下面这个信息会明显影响质量:
-- ...
+[路径 B：label]
+> [Complete prompt B]
+Judge: pass | minor_fix | rewrite_required
+风险: low | conditional | high
+翻转条件: ...
 
-先给你一个带占位符的版本:
-> ...
-
-你只要补充: ...
+[默认推荐]
+[Choose one path and state the deciding trade-off]
 ```
 
-## Level 3 Multi-Path Template
+Include Path C only when it is materially different. Derive every Judge field from the canonical `judge_result`; never expose scores or raw review traces.
 
-Use when the task is high-risk, strategic, or naturally has multiple valid paths.
+## Rules
 
-```text
-[SharpInput Level 3]
-
-诊断: ...
-
-路径 A - 稳妥推进:
-> ...
-Judge: pass | minor_fix | rewrite_required
-风险: ...
-
-路径 B - 强约束决策:
-> ...
-Judge: pass | minor_fix | rewrite_required
-风险: ...
-
-路径 C - 探索式拆解:
-> ...
-Judge: pass | minor_fix | rewrite_required
-风险: ...
-
-建议默认选: ...
-```
-
-If interactive option selection is available, ask the user to pick one or more paths using `AskUserQuestion`. If not, recommend the lowest-risk path first and still include all paths in text.
-
-## Output Rules
-
-- Keep the user's language unless the user asks for another language.
-- Always include one complete upgraded prompt.
-- If context is missing but not blocking, use explicit placeholders like `[预算范围]`.
-- Do not include hidden chain-of-thought, internal scores, or module handoff JSON in the final response.
-- Do not output only critique, rating, or "建议你这样问"; the copy-ready prompt is mandatory.
-- Use "默认答案压力测试" rather than "反共识" unless quoting old material.
+- Keep the user's language unless another language was requested.
+- Always include at least one complete upgraded prompt.
+- Use `[方括号占位符]` for missing information.
+- Use one consistent quote-block or plain-text presentation.
+- Do not emit empty metadata sections, internal scores, module state, or hidden reasoning.
+- Do not make users read a diagnostic report before reaching the prompt.
+- Use "默认答案压力测试" only when it was actually applied.

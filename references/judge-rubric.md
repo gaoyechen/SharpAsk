@@ -1,41 +1,22 @@
 # Judge Rubric
 
-Judge is used for Level 3, high-risk, multi-path, or explicitly requested review. It is not part of every quick rewrite.
+Use Judge for Level 3, high-risk or hard-to-reverse decisions, useful multi-path analysis, or an explicitly requested stress test.
 
-## Verdicts
+## Dimensions
 
-| Verdict | Meaning | Action |
-|---|---|---|
-| pass | prompt is faithful, useful, and copy-ready | render final output |
-| minor_fix | one or two targeted issues remain | patch the prompt once |
-| rewrite_required | intent drift, missing critical slot, or unusable structure | return to compiler/context |
-
-## Scoring Dimensions
-
-Score each from 1-5.
+Score each dimension from 1 to 5.
 
 | Dimension | 1 | 3 | 5 |
 |---|---|---|---|
-| Intent fidelity | changes user's goal | mostly aligned | preserves exact goal and nuance |
-| Scenario fit | generic | partly scenario-aware | slots match the concrete scenario |
-| Context sufficiency | critical gaps hidden | some placeholders | asks or exposes the key missing fields |
-| Constraint strength | vague | usable constraints | clear boundaries and non-goals |
-| Pressure fit | absent or forced | useful but rough | improves answer quality without overreach |
+| Intent fidelity | changes the user's goal | mostly aligned | preserves goal and nuance |
+| Scenario fit | forces the wrong scenario | partly specific | matches known scenario facts |
+| Context sufficiency | hides critical gaps | exposes some gaps | handles every critical gap |
+| Constraint strength | vague or invented | usable | explicit and faithful |
+| Pressure fit | absent or forced | useful but rough | improves quality without drift |
 | Output readiness | fragmented | copyable with edits | directly copy-ready |
-| Risk clarity | no risks | generic warning | clear flip condition or failure signal |
+| Risk clarity | no meaningful boundary | generic warning | concrete flip condition or failure signal |
 
-## Rewrite Triggers
-
-Return `rewrite_required` if any condition is true:
-
-- upgraded prompt answers the underlying task instead of improving the input
-- primary intent changes
-- scenario is guessed despite low confidence
-- a critical required slot is missing and not represented as a placeholder
-- pressure forces a conclusion or adversarial tone not requested by the user
-- final prompt lacks output format or acceptance criteria for generation tasks
-
-## Judge Output Shape
+## Canonical Result
 
 ```json
 {
@@ -51,12 +32,39 @@ Return `rewrite_required` if any condition is true:
   },
   "main_problem": "",
   "fix_instruction": "",
-  "flip_condition": ""
+  "flip_condition": "",
+  "risk_level": "low | conditional | high",
+  "evidence_status": "verified | unverified | not_applicable"
 }
 ```
 
-## Quality Thresholds
+For multiple paths, return:
 
-- Average >= 4.2 and no rewrite trigger: `pass`
-- Average 3.4-4.1 or one local issue: `minor_fix`
-- Average < 3.4 or any rewrite trigger: `rewrite_required`
+```json
+{
+  "judge_results": [
+    {
+      "path_id": "A",
+      "verdict": "pass",
+      "scores": {},
+      "main_problem": "",
+      "fix_instruction": "",
+      "flip_condition": "",
+      "risk_level": "low",
+      "evidence_status": "not_applicable"
+    }
+  ]
+}
+```
+
+Each `scores` object in `judge_results` must contain all seven dimensions from the canonical result.
+
+## Verdict Policy
+
+- Average `>= 4.0` and no rewrite trigger: `pass`.
+- Average `3.5-3.9` or one local issue: `minor_fix`.
+- Average `< 3.5` or any rewrite trigger: `rewrite_required`.
+
+Return `rewrite_required` when the prompt changes the user's intent, invents important scenario facts, answers the underlying task, hides a critical gap, forces an unrequested conclusion, or is not copy-ready.
+
+Set `evidence_status` to `unverified` rather than inventing a real-world example or factual claim.

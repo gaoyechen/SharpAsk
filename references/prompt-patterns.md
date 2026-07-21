@@ -83,14 +83,14 @@ content generation — not just the dimension name.
 | `peer-compare` | Porter's Competitive Strategy | What 1-2 peers are most worth comparing against? What is the key differentiator? |
 | `scale-effect` | Complex Systems | What qualitatively changes at 10x scale? What holds at small scale but collapses at scale? |
 
-### Mandatory Auxiliary Dimensions (Anchors)
+### Optional Auxiliary Dimensions
 
-These are not selectable dimensions — they are **mandatory fields** on every path at Level ≥ 1:
+Use these anchors only when temporal trajectory or peer comparison materially improves the task. Do not add them to routine Level 0/1 rewrites.
 
 | Anchor | Purpose | Content Requirement |
 |--------|---------|-------------------|
-| **Evolution Anchor** | Temporal positioning | Trajectory: where from → current stage → where heading. At least 3 time nodes. |
-| **Peer Anchor** | Spatial reference | 1-2 most relevant peers + key differentiator. Not a list — a comparative positioning. |
+| **Evolution Anchor** | Temporal positioning | Compare past, current, and future states when the decision spans time. |
+| **Peer Anchor** | Spatial reference | Compare 1-2 relevant peers when relative positioning affects the answer. |
 
 ---
 

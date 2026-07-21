@@ -1,48 +1,42 @@
----
-# Internal module — loaded by SharpInput AGENT.md routing, not a standalone skill.
-description:
----
-
 # Output Renderer
 
-Render the final response. Do not do new reasoning here except formatting and clarity cleanup.
+Render the final response without adding new analysis.
 
-## Required Output
+## Inputs
 
-```text
-[SharpInput 识别结果]
-Level:
-主意图:
-场景:
-上下文状态:
+- `level`
+- `primary_intent`
+- `scenario`
+- `context_status`
+- `compiled_prompt_draft` or `path_drafts`
+- `missing_placeholders`
+- `judge_result` or `judge_results`
+- `risk_notes`
 
-[原问题诊断]
-1. ...
-2. ...
-3. ...
+## Output By Level
 
-[升级版问题]
-> ...
+### Level 0
 
-[这版升级加入了什么]
-1. 角色:
-2. 目标:
-3. 约束:
-4. 判断标准:
-5. 输出格式:
-6. 默认答案压力测试:
+Return the complete upgraded prompt. Add at most one short note when a placeholder needs explanation.
 
-[取舍提醒]
-...
+### Level 1
 
-[最小补充项]
-...
-```
+Return the upgraded prompt, followed by a concise summary of the most important additions.
+
+### Level 2
+
+Return the upgraded prompt, then list only material assumptions/placeholders and one trade-off note.
+
+### Level 3
+
+Return two or three paths only when they are materially different. For each path, include the complete prompt and a concise summary derived from the canonical `judge_result`. Recommend a default path and explain the deciding trade-off.
 
 ## Rules
 
-- Always include a complete copy-ready prompt.
-- Do not output only diagnosis, scoring, or advice.
-- Keep the user's language.
-- If information is missing, show placeholders rather than blocking unless output quality would collapse.
-- If user requested quick mode, compress diagnosis and additions.
+- Put the copy-ready prompt before supporting commentary.
+- Keep the user's language unless another language was requested.
+- Use one consistent quote block or plain-text presentation for the prompt.
+- Never output handoff JSON, internal quality scores, hidden reasoning, or raw Judge traces.
+- Do not include empty sections such as "场景：未知" or "最小补充项：无".
+- Do not require SharpInput branding or a diagnostic report for quick requests.
+- When placeholders remain, name only those that materially affect the downstream answer.

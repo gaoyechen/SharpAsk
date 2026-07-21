@@ -1,6 +1,6 @@
 # Handoff Contract
 
-All SharpInput modules update the same handoff object. The object prevents natural-language handoff drift between capability modules.
+Maintain one internal state object across SharpInput capabilities. Do not expose this object to the user.
 
 ## Canonical Object
 
@@ -13,20 +13,24 @@ All SharpInput modules update the same handoff object. The object prevents natur
   "ambiguity_level": "low | medium | high",
   "level": 1,
   "route": "quick_rewrite | clarify_first | pressure_prompt | judge_mode",
+  "resume_route": "",
   "primary_intent": "",
   "secondary_intent": "",
-  "intent_confidence": 0.0,
+  "intent_confidence": "high | medium | low",
   "scenario": "",
-  "scenario_confidence": 0.0,
+  "scenario_confidence": "high | medium | low",
   "slot_template": "",
   "known_context": {},
   "missing_fields": [],
+  "blocking_fields": [],
   "slot_questions": [],
   "clarified_dimensions": [],
   "context_status": "complete | partial | insufficient",
+  "placeholder_strategy": true,
   "pressure_requirements": [],
   "overpressure_risk": "low | medium | high",
   "compiled_prompt_draft": "",
+  "path_drafts": [],
   "missing_placeholders": [],
   "fidelity_check": {
     "status": "pass | minor_drift | fail",
@@ -37,28 +41,30 @@ All SharpInput modules update the same handoff object. The object prevents natur
     "weak_dimensions": []
   },
   "judge_result": {},
-  "final_prompt": "",
+  "judge_results": [],
   "risk_notes": [],
-  "user_feedback": ""
+  "final_prompt": ""
 }
 ```
 
 ## Lifecycle
 
-1. Input normalization sets `raw_input`, `target_input`, `user_instruction`, and `task_mode`.
-2. Gate sets `level` and provisional `route`.
-3. Intent detection sets `primary_intent`, `secondary_intent`, and confidence.
-4. Scenario detection sets `scenario`, `slot_template`, and confidence.
-5. Slot/context completion fills `known_context`, `missing_fields`, `context_status`, and questions.
-6. Compiler writes `compiled_prompt_draft`.
-7. Pressure strategy writes `pressure_requirements`.
-8. Fidelity and quality checks write `fidelity_check` and `quality_score`.
-9. Judge writes `judge_result` when used.
-10. Renderer writes `final_prompt`.
+1. Normalization sets the raw and target inputs.
+2. Gate sets `level`, `route`, and optional `resume_route`.
+3. Intent detection sets intent and confidence.
+4. Scenario detection sets scenario, slot template, and confidence when useful.
+5. Context completion sets known context, missing/blocking fields, placeholders, and questions.
+6. Pressure selection writes `pressure_requirements` and `overpressure_risk`.
+7. Compiler consumes those requirements and writes the prompt draft or path drafts.
+8. Fidelity and quality checks write their results.
+9. Judge writes `judge_result` or `judge_results` for Level 3.
+10. Renderer writes the final user-facing response.
 
 ## Merge Rules
 
-- Never delete earlier fields unless they were clearly wrong.
-- Prefer arrays for missing fields, questions, risks, and notes.
-- Mark uncertainty explicitly instead of guessing.
-- If a module cannot run, leave its fields empty and add a `risk_notes` entry.
+- Preserve earlier fields unless later user evidence proves them wrong.
+- Use arrays for missing fields, questions, requirements, paths, and risks.
+- Mark uncertainty rather than guessing.
+- Do not run Compiler before pressure selection on Pressure or Judge routes.
+- When `clarify_first` is active, keep the intended final route in `resume_route`.
+- If a capability is unavailable, retain the canonical schema and record the downgrade in `risk_notes`.

@@ -3,10 +3,9 @@
 references/user-preferences.md
 references/user-preferences.json
 
-# test artifacts
-tests/*
-!tests/regression-cases.md
-!tests/quality-rubric.md
+# generated test artifacts
+tests/output/
+tests/tmp/
 test-prompts.json
 AGENTS.md
 

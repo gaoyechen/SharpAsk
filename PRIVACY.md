@@ -1,6 +1,6 @@
 # Privacy and Local State
 
-SharpInput is a prompt/input optimization skill. It should not publish or commit real user preference history.
+SharpInput is a prompt/input optimization skill. Durable preference learning is disabled by default and requires explicit user opt-in. Real user preference history must never be published or committed.
 
 ## What the repository contains
 
@@ -15,13 +15,21 @@ These files are safe to commit because they contain schema/default structure, no
 
 ## What must stay local
 
-Real runtime preference data should be stored in the active user's local Hermes profile data directory, for example:
+After opt-in, real runtime preference data should be stored in the active user's local agent/profile data directory. For Hermes, for example:
 
 ```text
 $HERMES_HOME/data/sharpinput/user-preferences.json
 ```
 
-If `$HERMES_HOME` is unavailable, use the equivalent active agent/profile data directory.
+For Codex or another host, use that host's user-local profile data directory. Never use the skill installation directory as runtime storage.
+
+Before reading or writing a preference file, verify:
+
+```json
+{"consent":{"enabled":true,"granted_at":"..."}}
+```
+
+Treat missing or legacy consent data as not opted in.
 
 Do **not** write private preferences into:
 
@@ -43,7 +51,7 @@ Keeping runtime state outside the skill package prevents:
 
 ## Resetting preferences
 
-If the user says "重置偏好" or "reset preferences", clear the runtime file contents back to the empty example shape.
+If the user says "重置偏好" or "reset preferences", clear the runtime file contents back to the empty example shape. This action is allowed even when durable learning is currently disabled.
 
 CLI reset example:
 
@@ -67,7 +75,7 @@ references/user-preferences.json
 references/user-preferences.md
 ```
 
-If either file exists in an installed package and contains real data:
+If either file exists in an installed package and contains real data, ask for opt-in before migration. After consent:
 
 1. Copy it once into the runtime state path.
 2. Validate or normalize it against `references/user-preferences.schema.json`.
@@ -76,4 +84,4 @@ If either file exists in an installed package and contains real data:
 
 ## Data handling promise
 
-SharpInput itself does not require any network upload of preference data. Preference state is intended to remain local to the user's active Hermes profile.
+SharpInput does not require network upload of preference data. It must not infer numeric outcome scores from tone, and it must not read, create, migrate, or update durable preference state without explicit opt-in.
